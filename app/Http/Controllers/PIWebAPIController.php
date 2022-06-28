@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\WebApiLog;
 
 class PIWebAPIController extends Controller
 {
@@ -37,6 +38,13 @@ class PIWebAPIController extends Controller
 
         $response = ['code' => $httpcode,'data' => $output];
 
+        $log = new WebApiLog();
+        $log->api_method = 'GET';
+        $log->api_url = $url;
+        $log->api_request = '{}';
+        $log->api_response = $output;
+        $log->save();
+
         return $response;
     }
 
@@ -58,6 +66,13 @@ class PIWebAPIController extends Controller
         curl_close($ch);
 
         $response = ['code' => $httpcode,'data' => json_decode($output)];
+
+        $log = new WebApiLog();
+        $log->api_method = 'POST';
+        $log->api_url = $url;
+        $log->api_request = json_encode($data);
+        $log->api_response = $output;
+        $log->save();
 
         return $response;
     }
