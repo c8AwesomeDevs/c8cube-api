@@ -25,7 +25,7 @@ class ConfigurationController extends Controller
             if($idx > 0) {
                 $data_key = new DataKey();
                 $data_key->certificate_type = $data[2];
-                $data_key->keyword = $data[0];
+                $data_key->keyword = strtolower(str_replace(',', '', str_replace(' ', '-', $data[0])));
                 $data_key->parameter = $data[1];
                 $data_key->save();
                 

@@ -78,7 +78,7 @@ class PIWebAPIController extends Controller
     }
 
     public function getTagDetails($tagname) {
-        $url = $this->piwebapi . '/points?path=\\\\' . $this->pi_server . '\\' . $tagname;
+        $url = $this->piwebapi . '/points?selectedFields=webid&path=\\\\' . $this->pi_server . '\\' . urlencode($tagname);
         $tagDetails = $this->getRequest($url);
 
         return $tagDetails;
@@ -93,7 +93,7 @@ class PIWebAPIController extends Controller
         $data = [
             1 => [
                 "Method" => "GET",
-                "Resource" => $this->piwebapi . '/dataservers?name=' . $this->pi_server
+                "Resource" => $this->piwebapi . '/dataservers?selectedFields=Links.Points&name=' . $this->pi_server
             ],
             2 => [
                 "Method" => "POST",
@@ -108,22 +108,23 @@ class PIWebAPIController extends Controller
         return $this->postRequest($url, $data);
     }
 
-    public function writeTagValue($tag, $value) {
+    public function writeTagValue($tag, $value, $timestamp) {
         $tagValue = [
-            'Timestamp' => date('Y-m-d\TH:i:s\Z'),
+            'Timestamp' => date('Y-m-d\TH:i:s\Z', strtotime($timestamp)),
             'Value' => $value
         ];
 
         $data = [
             1 => [
                 "Method" => "GET",
-                "Resource" => $this->piwebapi . '/points?path=\\\\' . $this->pi_server . '\\' . $tag
+                "Resource" => $this->piwebapi . '/points?selectedFields=webid&path=\\\\' . $this->pi_server . '\\' . $tag
             ],
             2 => [
                 "Method" => "POST",
-                "Resource" => "$.1.Content.Links.Value",
+                "Resource" => $this->piwebapi . "/streams/{0}/value?updateOption=insert",
                 "Content" => json_encode($tagValue),
-                "ParentIds" => ["1"]
+                "ParentIds" => ["1"],
+                "Parameters" => ["$.1.Content.WebId"]
             ]
         ];
 

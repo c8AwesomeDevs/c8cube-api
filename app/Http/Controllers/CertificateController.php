@@ -282,11 +282,14 @@ class CertificateController extends Controller
             'total-moisture',
             'volatile-matter',
             'total-sulphur',
+            'sulfur',
             'ash',
             'phosporous',
             'phosphorous',
+            'phosphorus',
             'chlorine',
             'sodium-in-ash',
+            'sodium',
         ];
 
         $ash_fushion_temp = [
@@ -331,7 +334,7 @@ class CertificateController extends Controller
         $metadata = [];
         $coal_data = [];
 
-        foreach($lines as $l) {
+        foreach($lines as $key => $l) {
             $line_arr = explode('   ', $l);
             if(count($line_arr)) {
                 if(preg_match('/[X\-].+MM/', trim(strtoupper($line_arr[0])), $output)) {
@@ -358,6 +361,7 @@ class CertificateController extends Controller
                 }
 
                 $param_md = $this->getMetaData($attribute);
+                
                 if($param_md) {
                     if($param_md == 'certificate-no.') {
                         $certno = str_replace(' ', '', $l);
@@ -391,7 +395,7 @@ class CertificateController extends Controller
                         }
                     }
                     elseif($param_md == 'vessel') {
-                        if(!isset($metadata['date'])) {
+                        if(!isset($metadata['vessel'])) {
                             $vessel = strtolower($l);
                             $vessel = str_replace(' ', '-', $vessel);
                             $position = strpos($vessel, 'date') + 6; // get start and end of vessel keyword
@@ -406,33 +410,38 @@ class CertificateController extends Controller
                 }
 
                 $param_cd = $this->getCoalData($attribute);
+                
                 if($param_cd) {
                     if(in_array($param_cd, $property)) {
-                        if(!isset($coal_data[$param_cd . '-arb'])) { //As Receive Basis
-                            $value = '';
-                            foreach($line_arr as $line_idx => $line_data) {
-                                $line_data = trim(str_replace([':', ';', ' ', '+', 'kcal/kg', '%', '>', ',', '$'], '', $line_data)); //Removing additional Characters in the Value
-                                if(is_numeric($line_data) ) {
-                                    $value = $line_data;
-                                    break;
-                                }
-                            }
-                            
-                            $coal_data[$param_cd . '-arb'] = $value;
-                        }
-                        else { // Air dried basis
-                            $value = '';
-                            foreach($line_arr as $line_idx => $line_data) {
-                                $line_data = trim(str_replace([':', ';', ' ', '+', 'kcal/kg', '%', '>', ',', '$'], '', $line_data)); //Removing additional Characters in the Value
-                                if(is_numeric($line_data) ) {
-                                    $value = $line_data;
-                                    break;
-                                }
-                            }
-                            if($value) {
-                                $coal_data[$param_cd . '-adb'] = $value;
+                        $type = '';
+                        foreach($line_arr as $line_idx => $line_data) {
+                            $line_data = trim(str_replace([':', ';', ' ', '+', 'kcal/kg', '%', '>', ',', '$'], '', $line_data)); //Removing additional Characters in the Value
+                            if(is_numeric($line_data) ) {
+                                $value = $line_data;
+                                break;
                             }
                         }
+
+                        if(strpos(strtolower($l), ' ar ') != null) { //As received
+                            $type = 'arb';
+                        }
+                        elseif(strpos(strtolower($l), '(ar)') != null) { //As received
+                            $type = 'arb';
+                        }
+                        elseif(strpos(strtolower($l), 'as received') != null) { //As received
+                            $type = 'arb';
+                        }
+                        elseif(strpos(strtolower($l), ' adb ') != null) { //Air Dried
+                            $type = 'adb';
+                        }
+                        elseif(strpos(strtolower($l), '(adb)') != null) { //Air Dried
+                            $type = 'adb';
+                        }
+                        elseif(strpos(strtolower($l), 'air dried basis') != null) { //Air Dried
+                            $type = 'adb';
+                        }
+                        
+                        $coal_data[$param_cd . '-' . $type] = $value;
                     }
                     else {
                         $value = '';
@@ -545,7 +554,7 @@ class CertificateController extends Controller
         $response = [];
         foreach($params->data as $d) {
             if(isset($d->value) && $d->value) {
-                $response[] = $piwebapi->writeTagValue($d->tagname, $d->value);
+                $response[] = $piwebapi->writeTagValue($d->tagname, $d->value, $d->timestamp);
             }
         }
 
@@ -560,11 +569,11 @@ class CertificateController extends Controller
 
     public function updateData($id, Request $request) {
         if(!$this->isAuthenticated($request->bearerToken())) {
-            return reponse()->json(['message' => 'Unauthorized'], 401);
+            return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        if(Auth::user()->access_level != 'uploader') {
-            return reponse()->json(['message' => 'Unauthorized'], 401);
+        if(Auth::user()->access_level == 'uploader') {
+            return response()->json(['message' => 'Unauthorized'], 401);
         }
         
         $params = json_decode($request->getContent());
@@ -580,6 +589,7 @@ class CertificateController extends Controller
             $parameter->value = $d->value;
             $parameter->parameter = $d->parameter;
             $parameter->tagname = $d->tagname;
+            $parameter->timestamp = date('Y-m-d 01:00:00', strtotime($params->metadata->certificate_date));;
             $parameter->save();
         }
 
